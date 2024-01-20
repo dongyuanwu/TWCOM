@@ -1,0 +1,28 @@
+Package: TWCOM
+Title: Tweedie Model for Inferring Cell--Cell Communication
+Version: 1.0
+Authors@R: 
+    person("Dongyuan", "Wu", , "dongyuanwu@ufl.edu", role = c("aut", "cre"))
+Description: This package provides the inference of cell--cell communication from spatially resolved transcriptomics data using Tweedie regression model.
+License: GPL (>= 3)
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.2.3
+Depends: 
+    R (>= 3.5.0)
+LazyData: true
+Imports:
+	Rdpack,
+	Rcpp,
+	foreach,
+	doParallel,
+	parallel,
+	mgcv,
+	fastDummies,
+	ComplexHeatmap,
+	igraph,
+	circlize,
+	stats,
+	grid
+LinkingTo: Rcpp
+RdMacros: Rdpack

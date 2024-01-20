@@ -1,0 +1,183 @@
+---
+title: "Inference of Cell-cell Communication using TWCOM"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: false
+    theme: flatly
+    number_sections: true
+---
+
+```{r setup, message=FALSE}
+library(TWCOM)
+library(Seurat)
+library(CellChat)
+```
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+    collapse = TRUE,
+    comment = "#>",
+    message = TRUE,
+    fig.align="center"
+)
+```
+
+This vignette demonstrates the detailed steps of inference and visualization of cell-cell communication for ligand-receptor pairs using spatially resolved transcriptomics (SRT) data. The corresponding data are from <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE144240" target="_blank">GSE144240</a>.
+
+# Inference of cell-cell communication from spot-based SRT data
+
+## Data and preprocessing
+
+**SRT gene expression matrix:** A gene expression matrix for the SRT data is necessary. Genes should be organized in rows with corresponding row names, while spots should be organized in columns with appropriate column names.
+
+```{r load STdata}
+data(STdata)
+STdata[1:5, 1:5]  # raw count data
+
+```
+
+We require that the input gene expression matrix has been normalized. Here, we use `Seurat` to normalize the original gene expression matrix.
+
+```{r}
+dat <- CreateSeuratObject(counts=STdata, meta.data=STmeta)
+dat <- NormalizeData(dat, assay = "RNA", scale.factor=10000)
+stdat <- dat@assays$RNA@data
+stdat[1:5, 1:5]  # normalized data
+
+```
+
+**SRT location information:** A data frame containing X and Y coordinates for each spot is also necessary. 
+
+```{r load STmeta}
+data(STmeta)
+head(STmeta)
+
+```
+
+**Cell type proportion matrix:** The information on cell type proportions can be obtained from upstream cell type deconvolution software, such as <a href="https://github.com/dmcable/spacexr" target="_blank">RCTD</a>, <a href="https://github.com/DongqingSun96/STRIDE" target="_blank">STRIDE</a>, and <a href="https://github.com/MarcElosua/SPOTlight" target="_blank">SPOTlight</a>. In this matrix, rows represent spots, and columns represent cell types.
+
+```{r load M}
+data(MExample)
+MExample[1:5, 1:5]
+
+```
+
+**Ligand-receptor pairs information:**
+
+Users can obtain ligand-receptor pairs from different public databases, such as <a href="https://github.com/jinworks/CellChat" target="_blank">CellChatDB</a>, <a href="https://github.com/ventolab/CellphoneDB" target="_blank">CellPhoneDB</a>, and <a href="https://github.com/ZJUFanLab/CellTalkDB" target="_blank">CellTalkDB</a>. Here, we use `CellChat` as an example. It is important to note that `CellChat` supports subunits for ligands or receptors, and we organize them in a `list` format. If the database does not have any subunit settings, users can directly organize them in a `vector` format. They just need to ensure that the order of ligands and receptors can be matched.
+
+```{r load LR pair 1}
+lrdb <- CellChatDB.human
+ligands <- receptors <- vector(mode="list", length=nrow(lrdb$interaction))
+
+for(i in 1:length(ligands)) {
+    
+    if(!(lrdb$interaction$ligand[i] %in% rownames(lrdb$complex))) {
+        ligands[[i]] <- lrdb$interaction$ligand[i]
+    } else {
+        ltemp <- c(lrdb$complex[rownames(lrdb$complex) == lrdb$interaction$ligand[i], ])
+        ltemp <- ltemp[nzchar(ltemp)]
+        ligands[[i]] <- ltemp
+    }
+    
+    if(!(lrdb$interaction$receptor[i] %in% rownames(lrdb$complex))) {
+        receptors[[i]] <- lrdb$interaction$receptor[i]
+    } else {
+        ltemp <- c(lrdb$complex[rownames(lrdb$complex) == lrdb$interaction$receptor[i], ])
+        ltemp <- ltemp[nzchar(ltemp)]
+        receptors[[i]] <- ltemp
+    }
+    
+}
+ligands <- lapply(ligands, unlist)
+receptors <- lapply(receptors, unlist)
+
+```
+
+## Inferring cell-cell communication
+
+The necessary inputs for `FRETCOM()` include the normalized gene expression matrix (`stdat`), the cell type proportion matrix (`M`), the X and Y coordinates (`coordx` and `coordy`), the known ligand-receptor pairs (`ligands` and `receptors`), and the maximum distance allowed for communication (`maxdist`). It is important to note that a reasonable `maxdist` should be set based on the units of `coordx` and `coordy` provided.
+
+Here, for simplicity, we use only the first two ligand-receptor pairs as examples.
+
+```{r}
+restab <- FRETCOM(stdat=stdat, M=MExample, ligands=ligands[1:2], receptors=receptors[1:2],
+                  coordx=STmeta$x, coordy=STmeta$y, maxdist=3)
+restab[1:5, ]
+
+```
+
+Obviously, the second ligand-receptor pair was filtered out because of its non-existence in SRT data, and we only obtained the results of cell-cell communication for one ligand-receptor pair.
+
+## Visualization
+
+In practice, we highly recommend that users generate figures using the results data frame (`restab`) themselves so that features in the figures, such as titles, colors, and font sizes, can be adjusted flexibly. However, we still provide two functions `CCCHeatmap()` and `CCCNetwork()` here for simple visualizations.
+
+### Heatmap
+
+```{r heatmap 1, fig.align='center', fig.width=8, fig.height=8}
+CCCHeatmap(restab, ligand="TGFB1", receptor="TGFBR1_TGFBR2")
+
+```
+
+### Network
+
+```{r network 1, fig.align='center', fig.width=8, fig.height=8}
+CCCNetwork(restab, ligand="TGFB1", receptor="TGFBR1_TGFBR2", cutoff=0.01)
+
+```
+
+# Inference of cell-cell communication from single-cell resolution SRT data
+
+To demonstrate the inference from single-cell resolution data, we simply treat the `STdata` as if it were single-cell resolution data. We then identify the cell type with the highest proportion in `MExample` and assign that cell type to the specific 'cell'. Notice that the specific cell type information should be stored within the meta data (e.g., `STmeta`).
+
+```{r}
+STmeta$cell_type <- colnames(MExample)[apply(MExample, 1, which.max)]
+STmeta[1:5, ]
+
+```
+
+## Data and preprocessing
+
+**Cell type identification matrix:** Assuming we already know the cell type information for each cell, we can use `CellTypeMatrix()` to generate the corresponding matrix for cell type identification. This matrix, where rows represent cells and columns represent cell types, can be used in subsequent analyses.
+
+```{r generate M}
+Mnew <- CellTypeMatrix(stmeta=STmeta, celltype="cell_type")
+Mnew[1:10, 1:5]
+
+```
+
+## Inferring cell-cell communication
+
+All the following steps should be the same as the inference for the spot-based SRT data demonstrated above.
+
+The necessary inputs for `FRETCOM()` include the normalized gene expression matrix (`stdat`), the cell type proportion matrix (`M`), the X and Y coordinates (`coordx` and `coordy`), the known ligand-receptor pairs (`ligands` and `receptors`), and the maximum distance allowed for communication (`maxdist`). It is important to note that a reasonable `maxdist` should be set based on the units of `coordx` and `coordy` provided.
+
+For simplicity, we use only the first two ligand-receptor pairs as examples.
+
+```{r}
+restab <- FRETCOM(stdat=stdat, M=Mnew, ligands=ligands[1:2], receptors=receptors[1:2],
+                  coordx=STmeta$x, coordy=STmeta$y, maxdist=3)
+restab[1:5, ]
+
+```
+
+## Visualization
+
+In practice, we highly recommend that users generate figures using the results data frame (`restab`) themselves so that features in the figures, such as titles, colors, and font sizes, can be adjusted flexibly. However, we still provide two functions `CCCHeatmap()` and `CCCNetwork()` here for simple visualizations.
+
+### Heatmap
+
+```{r heatmap 2, fig.align='center', fig.width=8, fig.height=8}
+CCCHeatmap(restab, ligand="TGFB1", receptor="TGFBR1_TGFBR2")
+
+```
+
+### Network
+
+```{r network 2, fig.align='center', fig.width=8, fig.height=8}
+CCCNetwork(restab, ligand="TGFB1", receptor="TGFBR1_TGFBR2", cutoff=0.05)
+
+```
