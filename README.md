@@ -26,4 +26,4 @@ devtools::install_github("dongyuanwu/TWCOM")
 
 ## Bugs, Questions, or Comments
 
-If you have any issues, bugs, questions, comments, or suggestions, please file an <a href="https://github.com/dongyuanwu/TWCOM/issues">issue</a> on GitHub.
+If you have any bugs, questions, comments, or suggestions, please file an <a href="https://github.com/dongyuanwu/TWCOM/issues">issue</a> on GitHub.
