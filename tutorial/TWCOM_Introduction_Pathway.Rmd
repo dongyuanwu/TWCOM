@@ -1,0 +1,151 @@
+---
+title: "Inference of Cell-cell Communication for Signaling Pathways using TWCOM"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: false
+    theme: flatly
+    number_sections: true
+---
+
+```{r setup, message=FALSE}
+library(TWCOM)
+library(Seurat)
+library(CellChat)
+```
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+    collapse = TRUE,
+    comment = "#>",
+    message = TRUE,
+    fig.align="center"
+)
+```
+
+This vignette demonstrates the detailed steps of inference and visualization of cell-cell communication for signaling pathways from spatially resolved transcriptomics (SRT) data. The corresponding data are from <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE144240" target="_blank">GSE144240</a>.
+
+The entire process should be very similar to <a href="https://dongyuanwu.github.io/assets/tutoridal/TWCOM_Introduction.html" target="_blank">the tutorial for ligand-receptor pairs</a>. The only difference is that we need the `pathways` information aligned with `ligands` and `receptors`, and pass them into `FRETCOMPathway()` to obtain the inference results. 
+
+For illustrative purposes, we exclusively utilize spot-based SRT data in this context. For guidance on handling single-cell resolution data, please refer to <a href="https://dongyuanwu.github.io/assets/tutoridal/TWCOM_Introduction.html" target="_blank">the tutorial for ligand-receptor pairs</a>.
+
+# Data and preprocessing
+
+**SRT gene expression matrix:** A gene expression matrix for the SRT data is necessary. Genes should be organized in rows with corresponding row names, while spots should be organized in columns with appropriate column names.
+
+```{r load STdata}
+data(STdata)
+STdata[1:5, 1:5]  # raw count data
+
+```
+
+We require that the input gene expression matrix has been normalized. Here, we use `Seurat` to normalize the original gene expression matrix.
+
+```{r}
+dat <- CreateSeuratObject(counts=STdata, meta.data=STmeta)
+dat <- NormalizeData(dat, assay = "RNA", scale.factor=10000)
+stdat <- dat@assays$RNA@data
+stdat[1:5, 1:5]  # normalized data
+
+```
+
+**SRT location information:** A data frame containing X and Y coordinates for each spot is also necessary. 
+
+```{r load STmeta}
+data(STmeta)
+head(STmeta)
+
+```
+
+**Cell type proportion matrix:** The information on cell type proportions can be obtained from upstream cell type deconvolution software, such as <a href="https://github.com/dmcable/spacexr" target="_blank">RCTD</a>, <a href="https://github.com/DongqingSun96/STRIDE" target="_blank">STRIDE</a>, and <a href="https://github.com/MarcElosua/SPOTlight" target="_blank">SPOTlight</a>. In this matrix, rows represent spots, and columns represent cell types.
+
+```{r load M}
+data(MExample)
+MExample[1:5, 1:5]
+
+```
+
+**Ligand-receptor pairs and their corresponding signaling pathways information:**
+
+Users can obtain ligand-receptor pairs from different public databases, such as <a href="https://github.com/jinworks/CellChat" target="_blank">CellChatDB</a>, <a href="https://github.com/ventolab/CellphoneDB" target="_blank">CellPhoneDB</a>, and <a href="https://github.com/ZJUFanLab/CellTalkDB" target="_blank">CellTalkDB</a>. Here, we use `CellChat` as an example. It is important to note that `CellChat` supports subunits for ligands or receptors, and we organize them in a `list` format. If the database does not have any subunit settings, users can directly organize them in a `vector` format. They just need to ensure that the order of ligands and receptors can be matched.
+
+```{r load LR pair}
+lrdb <- CellChatDB.human
+ligands <- receptors <- vector(mode="list", length=nrow(lrdb$interaction))
+pathways <- NULL
+
+for(i in 1:length(ligands)) {
+    
+    pathways <- c(pathways, lrdb$interaction$pathway_name[i])
+    
+    if(!(lrdb$interaction$ligand[i] %in% rownames(lrdb$complex))) {
+        ligands[[i]] <- lrdb$interaction$ligand[i]
+    } else {
+        ltemp <- c(lrdb$complex[rownames(lrdb$complex) == lrdb$interaction$ligand[i], ])
+        ltemp <- ltemp[nzchar(ltemp)]
+        ligands[[i]] <- ltemp
+    }
+    
+    if(!(lrdb$interaction$receptor[i] %in% rownames(lrdb$complex))) {
+        receptors[[i]] <- lrdb$interaction$receptor[i]
+    } else {
+        ltemp <- c(lrdb$complex[rownames(lrdb$complex) == lrdb$interaction$receptor[i], ])
+        ltemp <- ltemp[nzchar(ltemp)]
+        receptors[[i]] <- ltemp
+    }
+    
+}
+ligands <- lapply(ligands, unlist)
+receptors <- lapply(receptors, unlist)
+
+```
+
+# Inferring cell-cell communication
+
+The necessary inputs for `FRETCOMPathway()` include the normalized gene expression matrix (`stdat`), the cell type proportion matrix (`M`), the X and Y coordinates (`coordx` and `coordy`), the known ligand-receptor pairs (`ligands` and `receptors`), the known corresponding pathway names (`pathways`), and the maximum distance allowed for communication (`maxdist`). It is important to note that a reasonable `maxdist` should be set based on the units of `coordx` and `coordy` provided.
+
+Here, for simplicity, we use only two pathways (`TGFb` and `WNT`) as examples.
+
+```{r}
+ligands <- ligands[pathways %in% c("TGFb", "WNT")]
+receptors <- receptors[pathways %in% c("TGFb", "WNT")]
+pathways <- pathways[pathways %in% c("TGFb", "WNT")]
+restab <- FRETCOMPathway(stdat=stdat, M=MExample, ligands=ligands, receptors=receptors,
+                         pathways=pathways, coordx=STmeta$x, coordy=STmeta$y, maxdist=3,
+                         parallel=TRUE)
+restab[1:5, ]
+
+```
+
+# Visualization
+
+In practice, we highly recommend that users generate figures using the results data frame (`restab`) themselves so that features in the figures, such as titles, colors, and font sizes, can be adjusted flexibly. However, we still provide two functions `CCCHeatmap()` and `CCCNetwork()` here for simple visualizations.
+
+## Heatmap
+
+```{r heatmap, fig.align='center', fig.width=8, fig.height=8}
+CCCHeatmap(restab, pathway="TGFb")
+
+```
+
+In addition to the specific signaling pathway, user can also visualize the overall cell-cell communication results.
+
+```{r heatmap overall, fig.align='center', fig.width=8, fig.height=8}
+CCCHeatmap(restab, pathway="Overall")
+
+```
+
+## Network
+
+```{r network, fig.align='center', fig.width=8, fig.height=8}
+CCCNetwork(restab, cutoff=0.01, pathway="WNT")
+
+```
+
+In addition to the specific signaling pathway, user can also visualize the overall cell-cell communication results.
+
+```{r network overall, fig.align='center', fig.width=8, fig.height=8}
+CCCNetwork(restab, cutoff=0.01, pathway="Overall")
+
+```

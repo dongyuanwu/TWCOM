@@ -1,5 +1,5 @@
 ---
-title: "Inference of Cell-cell Communication using TWCOM"
+title: "Inference of Cell-cell Communication for Ligand-receptor Pairs using TWCOM"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
@@ -24,7 +24,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-This vignette demonstrates the detailed steps of inference and visualization of cell-cell communication for ligand-receptor pairs using spatially resolved transcriptomics (SRT) data. The corresponding data are from <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE144240" target="_blank">GSE144240</a>.
+This vignette demonstrates the detailed steps of inference and visualization of cell-cell communication for ligand-receptor pairs from spatially resolved transcriptomics (SRT) data. The corresponding data are from <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE144240" target="_blank">GSE144240</a>.
 
 # Inference of cell-cell communication from spot-based SRT data
 

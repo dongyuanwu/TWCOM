@@ -20,7 +20,7 @@
 #'              order can match the order of columns in `stdat`.
 #' @param maxdist The maximum distance allowed for communication. This number 
 #'                should be based on the units of `coordx` and `coordy`. Usually, 
-#'                we would recommend 200-300 μm.
+#'                we would recommend 200-300 \eqn{\mu}m.
 #' @param sampleid A vector of sample IDs for cells/spots. Please make sure the 
 #'              order can match the order of columns in `stdat`. Default is `NULL`,
 #'              i.e., only considering one sample. 
@@ -331,7 +331,7 @@ FRETCOM <- function(stdat, M, ligands, receptors, ngridx=5, ngridy=5,
 #'              order can match the order of columns in `stdat`.
 #' @param maxdist The maximum distance allowed for communication. This number 
 #'                should be based on the units of `coordx` and `coordy`. Usually, 
-#'                we would recommend 200-300 μm.
+#'                we would recommend 200-300 \eqn{\mu}m.
 #' @param sampleid A vector of sample IDs for cells/spots. Please make sure the 
 #'              order can match the order of columns in `stdat`. Default is `NULL`,
 #'              i.e., only considering one sample. 
@@ -460,7 +460,8 @@ FRETCOMPathway <- function(stdat, M, ligands, receptors, pathways,
     
     for(k in 1:length(pathways_uniq)) {
         
-        Cspots_temp <- matrix(unlist(Cspots[pathways == pathways_uniq[k]]), ncol=length(posi))
+        Cspots_temp <- matrix(unlist(Cspots[pathways == pathways_uniq[k]]), 
+                              ncol=sum(pathways == pathways_uniq[k]))
         Cspots_aggregate[[k]] <- rowSums(Cspots_temp)
         
     }
@@ -481,8 +482,8 @@ FRETCOMPathway <- function(stdat, M, ligands, receptors, pathways,
     
     if (length(Cspots_aggregate) > 1) {
         
-        Cspots_temp <- matrix(unlist(Cspots_aggregate), ncol=length(posi))
-        Cspots_aggregate <- c(Cspots_aggregate, rowSums(Cspots_temp))
+        Cspots_temp <- matrix(unlist(Cspots_aggregate), ncol=length(Cspots_aggregate))
+        Cspots_aggregate <- c(Cspots_aggregate, list(rowSums(Cspots_temp)))
         
     }
     

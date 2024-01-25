@@ -53,7 +53,7 @@ order can match the order of columns in \code{stdat}.}
 
 \item{maxdist}{The maximum distance allowed for communication. This number
 should be based on the units of \code{coordx} and \code{coordy}. Usually,
-we would recommend 200-300 μm.}
+we would recommend 200-300 \eqn{\mu}m.}
 
 \item{sampleid}{A vector of sample IDs for cells/spots. Please make sure the
 order can match the order of columns in \code{stdat}. Default is \code{NULL},
