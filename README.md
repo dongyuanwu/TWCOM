@@ -20,7 +20,7 @@ devtools::install_github("dongyuanwu/TWCOM")
 	Inference of Cell-cell Communication for Ligand-receptor Pairs using TWCOM
 </a>
 
-- <a href="https://htmlpreview.github.io/?https://github.com/dongyuanwu/TWCOM/blob/main/tutorial/TWCOM_Pathway_Introduction.html" target="_blank">
+- <a href="https://htmlpreview.github.io/?https://github.com/dongyuanwu/TWCOM/blob/main/tutorial/TWCOM_Introduction_Pathway.html" target="_blank">
 	Inference of Cell-cell Communication for Signaling Pathways using TWCOM
 </a>
 
