@@ -717,7 +717,7 @@ gamfun <- function(Ms, dist, Y, spot, rholist) {
     X <- scale(Ms * exp(-rho_best*dist), center=TRUE, scale=TRUE)
     tempdat[, 2:(ncol(tempdat)-2)] <- X
     
-    gamfit <- tryCatch({summary(bam(as.formula(formu), family=tw(), data=tempdat))},
+    gamfit <- tryCatch({summary(bam(as.formula(formu), family=tw(), data=tempdat, discrete=TRUE))},
                        error=function(e){summary(gam(as.formula(formu), family=tw(), data=tempdat))})
     
     coefest <- as.vector(gamfit$p.coeff)
@@ -743,7 +743,7 @@ gamfun_single <- function(Ms, dist, Y, spot, rho) {
     formu <- paste0(formu, "+s(", colnames(tempdat)[ncol(tempdat)-1],
                     ", bs='re') + s(", colnames(tempdat)[ncol(tempdat)], ", bs='re')")
     
-    gamfit <- tryCatch({summary(bam(as.formula(formu), family=tw(), data=tempdat))},
+    gamfit <- tryCatch({summary(bam(as.formula(formu), family=tw(), data=tempdat, discrete=TRUE))},
                        error=function(e){summary(gam(as.formula(formu), family=tw(), data=tempdat))})
     
     coefest <- as.vector(gamfit$p.coeff)
