@@ -468,14 +468,14 @@ FRETCOMPathway <- function(stdat, M, ligands, receptors, pathways,
     }
     
     nonzero_prop <- sapply(Cspots_aggregate, function(x) sum(x != 0) / nrow(spot))
-    checkprop <- nonzero_prop >= 0.02
+    checkprop <- nonzero_prop >= 0.025
     
     if (sum(!checkprop) > 0) {
         
         # ligands <- ligands[checkprop]
         # receptors <- receptors[checkprop]
         Cspots_aggregate <- Cspots_aggregate[checkprop]
-        pathways <- pathways[checkprop]
+        pathways_uniq <- pathways_uniq[checkprop]
         message(sprintf("%s out of %s signaling pathways have been removed due to a lack of gene expression information in SRT data.", 
                         sum(!checkprop), length(checkprop)))
         
@@ -499,7 +499,7 @@ FRETCOMPathway <- function(stdat, M, ligands, receptors, pathways,
         Ms <- get_Ms(M, spot)
         
     }
-    rmposi <- which(apply(Ms, 2, function(x) sum(x > 0)) < (nrow(Ms)*0.0001))
+    rmposi <- which(apply(Ms, 2, function(x) sum(x > 0)) < (nrow(Ms)*0.001))
     if (length(rmposi) > 0) {
         
         if (length(rmposi) == ncol(Ms)) {
@@ -702,11 +702,11 @@ gamfun <- function(Ms, dist, Y, spot, rholist) {
         tryCatch({
             tempaic <- bam(as.formula(formu), family=tw(), data=tempdat, method="ML")$aic
         }, error=function(e){})
-        if(is.na(tempaic)) {
-            tempaic <- gam(as.formula(formu), family=tw(), data=tempdat, method="ML")$aic
-        }
+        # if(is.na(tempaic)) {    # gam() might be too slow for the large scale data
+        #     tempaic <- gam(as.formula(formu), family=tw(), data=tempdat, method="ML")$aic
+        # }
         message(sprintf("Rho = %s: AIC = %s", rho, tempaic))
-        if (tempaic < aic_best) {
+        if (!is.na(tempaic) & (tempaic < aic_best)) {
             
             aic_best <- tempaic
             rho_best <- rho
@@ -719,7 +719,7 @@ gamfun <- function(Ms, dist, Y, spot, rholist) {
     tempdat[, 2:(ncol(tempdat)-2)] <- X
     
     gamfit <- tryCatch({summary(bam(as.formula(formu), family=tw(), data=tempdat, discrete=TRUE))},
-                       error=function(e){summary(gam(as.formula(formu), family=tw(), data=tempdat))})
+                       error=function(e){summary(bam(as.formula(formu), family=tw(), data=tempdat, discrete=FALSE))})
     
     coefest <- as.vector(gamfit$p.coeff)
     pval <- as.vector(gamfit$p.pv)
@@ -745,7 +745,7 @@ gamfun_single <- function(Ms, dist, Y, spot, rho) {
                     ", bs='re') + s(", colnames(tempdat)[ncol(tempdat)], ", bs='re')")
     
     gamfit <- tryCatch({summary(bam(as.formula(formu), family=tw(), data=tempdat, discrete=TRUE))},
-                       error=function(e){summary(gam(as.formula(formu), family=tw(), data=tempdat))})
+                       error=function(e){summary(bam(as.formula(formu), family=tw(), data=tempdat, discrete=FALSE))})
     
     coefest <- as.vector(gamfit$p.coeff)
     pval <- as.vector(gamfit$p.pv)
