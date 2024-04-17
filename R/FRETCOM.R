@@ -143,7 +143,7 @@ FRETCOM <- function(stdat, M, ligands, receptors, ngridx=5, ngridy=5,
     Cspots <- Cspots[posi]
     
     nonzero_prop <- sapply(Cspots, function(x) sum(x != 0) / nrow(spot))
-    checkprop <- nonzero_prop >= 0.02
+    checkprop <- nonzero_prop >= 0.025
     
     if (sum(!checkprop) > 0) {
         
@@ -166,7 +166,7 @@ FRETCOM <- function(stdat, M, ligands, receptors, ngridx=5, ngridy=5,
         Ms <- get_Ms(M, spot)
         
     }
-    rmposi <- which(apply(Ms, 2, function(x) sum(x > 0)) < (nrow(Ms)*0.0001))
+    rmposi <- which(apply(Ms, 2, function(x) sum(x > 0)) < (nrow(Ms)*0.001))
     if (length(rmposi) > 0) {
         
         if (length(rmposi) == ncol(Ms)) {
@@ -175,6 +175,8 @@ FRETCOM <- function(stdat, M, ligands, receptors, ngridx=5, ngridy=5,
             
         } else {
             
+            message(sprintf("%s out of %s cell type interactions have been removed due to a lack of information.", 
+                            length(rmposi), length(celltype_interaction)))
             celltype_interaction <- celltype_interaction[-rmposi]
             Ms <- Ms[, -rmposi]
             
@@ -651,7 +653,7 @@ FRETCOMPathway <- function(stdat, M, ligands, receptors, pathways,
                                       message(sprintf("Pathway: %s", k))
                                       
                                       Y <- Cspots_aggregate[[k]]
-                                      tempres <- gamfun_single(Ms=Ms, dist=D, Y=Y, spot=spot1, rho=rholist)
+                                      tempres <- gamfun(Ms=Ms, dist=D, Y=Y, spot=spot1, rho=rholist)
                                       
                                       temp_pathway <- ifelse(k == length(Cspots_aggregate), "Overall", pathways_uniq[k])
                                       
