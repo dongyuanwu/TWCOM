@@ -403,6 +403,7 @@ FRETCOMPathway <- function(stdat, M, ligands, receptors, pathways,
             
         } else {
             
+            sampleid <- as.numeric(as.factor(sampleid))
             check_neighbor <- if_neighbors(coordx, coordy, sampleid, dist=maxdist)
             
         }
