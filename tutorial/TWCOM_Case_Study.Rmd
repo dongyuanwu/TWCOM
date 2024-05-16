@@ -1,0 +1,241 @@
+---
+title: "Cell-cell Communication for Signaling Pathways from Spatially Resolved Transcriptomics Data Realted to Alzheimer's Disease"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: false
+    theme: flatly
+    number_sections: true
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+    collapse = TRUE,
+    comment = "#>",
+    message = TRUE,
+    fig.align = "center"
+)
+knitr::opts_knit$set(root.dir = "/blue/datta/dongyuanwu/")
+setwd("/blue/datta/dongyuanwu/")
+```
+
+```{r, message=FALSE}
+library(TWCOM)
+library(CellChat)
+library(data.table)
+library(dplyr)
+subpath <- "./Alzheimer"
+```
+
+This vignette demonstrates `TWCOM`'s application to single-cell resolution spatially resolved transcriptomics (SRT) data, specifically in mice brain tissues with or without Alzheimer's disease. The corresponding dataset can be accessed via <a href="https://doi.org/10.5281/zenodo.7332091" target="_blank">Zenodo</a>.
+
+# Data and preprocessing
+
+## Load data
+
+```{r load data}
+# normalized gene expression matrix
+spdat <- as.data.frame(fread(paste0(subpath, "/Data/expression_matrix_normalized.csv"),
+                             header=TRUE))
+# metadata
+spmeta <- as.data.frame(fread(paste0(subpath, "/Data/metadata.csv"), header=TRUE)[-1, ])
+# spatial location
+spfile <- list.files(paste0(subpath, "/Data/"), "spatial")
+splist <- vector(mode="list", length=length(spfile))
+for(i in 1:length(spfile)) {
+    splist[[i]] <- as.data.frame(fread(paste0(subpath, "/Data/", spfile[i]), 
+                                       header=TRUE)[-1, ])
+    for(j in 2:5) {
+        splist[[i]][, j] <- as.numeric(splist[[i]][, j])
+    }
+}
+splist_comb <- do.call("rbind", splist)
+# combined with metadata and check the order of cells
+spmeta <- left_join(spmeta, splist_comb[, 1:5], by="NAME")
+rownames(spdat) <- spdat[, 1]
+spdat <- spdat[, -1]
+spmeta <- spmeta[order(match(spmeta$NAME, colnames(spdat))), ]
+rownames(spmeta) <- spmeta$NAME
+```
+
+## Filtering
+
+```{r filtering}
+keepposi <- which(spmeta$time == "13months")
+spdat <- spdat[, keepposi]
+spmeta <- spmeta[keepposi, ]
+keepposi <- which(apply(spdat, 2, function(x) sum(x != 0)) > 100)
+spdat <- spdat[, keepposi]
+spmeta <- spmeta[keepposi, ]
+rmgene <- which(apply(spdat, 1, function(x) sum(x!=0)) < (ncol(spdat) * 0.025))
+spdat <- spdat[-rmgene, ]
+# separate disease vs. control
+posi_AD <- which(spmeta$group == "disease")
+spdat_AD <- spdat[, posi_AD]
+spmeta_AD <- spmeta[posi_AD, ]
+posi_CON <- which(spmeta$group == "control")
+spdat_CON <- spdat[, posi_CON]
+spmeta_CON <- spmeta[posi_CON, ]
+```
+
+## Load ligand-receptor pairs and signaling pathways
+
+We obtained the information using `CellChat`.
+
+```{r load LR pair}
+lrdb <- CellChatDB.mouse
+ligands <- receptors <- vector(mode="list", length=nrow(lrdb$interaction))
+
+for(i in 1:length(ligands)) {
+    
+    if(!(lrdb$interaction$ligand[i] %in% rownames(lrdb$complex))) {
+        ligands[[i]] <- lrdb$interaction$ligand[i]
+    } else {
+        ltemp <- c(lrdb$complex[rownames(lrdb$complex) == lrdb$interaction$ligand[i], ])
+        ltemp <- ltemp[nzchar(ltemp)]
+        ligands[[i]] <- ltemp
+    }
+    
+    if(!(lrdb$interaction$receptor[i] %in% rownames(lrdb$complex))) {
+        receptors[[i]] <- lrdb$interaction$receptor[i]
+    } else {
+        ltemp <- c(lrdb$complex[rownames(lrdb$complex) == lrdb$interaction$receptor[i], ])
+        ltemp <- ltemp[nzchar(ltemp)]
+        receptors[[i]] <- ltemp
+    }
+    
+}
+ligands <- lapply(ligands, unlist)
+receptors <- lapply(receptors, unlist)
+pathways <- lrdb$interaction$pathway_name
+```
+
+## Obtain cell type idenfitication matrix
+
+We can first check the cell type information for AD and CON, separately.
+
+```{r Mnew, fig.align='center', fig.width=7, fig.height=6}
+table(spmeta_AD$top_level_cell_type)
+table(spmeta_CON$top_level_cell_type)
+ggplot(spmeta, aes(x=`X-scaled`, y=`Y-scaled`, color=top_level_cell_type)) +
+  geom_point(size=0.5) + theme_bw() +
+  facet_grid(replicate ~ group) +
+  guides(colour = guide_legend(override.aes = list(size=2))) +
+  labs(color = "Cell Type")
+Mnew_AD <- CellTypeMatrix(stmeta=spmeta_AD, celltype="top_level_cell_type")
+Mnew_CON <- CellTypeMatrix(stmeta=spmeta_CON, celltype="top_level_cell_type")
+```
+
+# Inferring cell-cell communication
+
+The necessary inputs for `FRETCOMPathway()` include the normalized gene expression matrix (`stdat`), the cell type proportion matrix (`M`), the X and Y coordinates (`coordx` and `coordy`), the known ligand-receptor pairs (`ligands` and `receptors`), the known corresponding pathway names (`pathways`), and the maximum distance allowed for communication (`maxdist`). It is important to note that a reasonable `maxdist` should be set based on the units of `coordx` and `coordy` provided.
+
+```{r}
+restab_AD <- FRETCOMPathway(stdat=spdat_AD, M=Mnew_AD, ligands=ligands,
+                            receptors=receptors, pathways=pathways, 
+                            sampleid=spmeta_AD$replicate,
+                            coordx=spmeta_AD$`X-scaled`, coordy=spmeta_AD$`Y-scaled`, 
+                            maxdist=200, rholist=c(0.03, 0.05), 
+                            parallel=TRUE, ncores=8)
+restab_CON <- FRETCOMPathway(stdat=spdat_CON, M=Mnew_CON, ligands=ligands,
+                             receptors=receptors, pathways=pathways, 
+                             sampleid=spmeta_CON$replicate,
+                             coordx=spmeta_CON$`X-scaled`, coordy=spmeta_CON$`Y-scaled`, 
+                             maxdist=200, rholist=c(0.03, 0.05), 
+                             parallel=TRUE, ncores=8)
+```
+
+We can check the pathways for disease group and control group, separately:
+
+```{r}
+unique(restab_AD$Pathway)   # disease group
+unique(restab_CON$Pathway)   # control group
+```
+
+# Network Visualization
+
+We focus on the LAMININ signaling pathway as an example for cellular communication network visualization. Although the built-in function `CCCNetwork()` can provide an easy way to demonstrate the results, we prefer to generate the plots manually for better visualization.
+
+```{r, fig.align='center', fig.width=8, fig.height=4}
+# filter the results
+cutoff <- 0.05
+weight <- 50
+pathname <- "LAMININ"
+tempres_AD <- restab_AD[restab_AD$Pathway == pathname, ]
+tempres_AD$Qvalue[is.nan(tempres_AD$Qvalue)] <- 1
+tempres_AD <- tempres_AD[tempres_AD$Qvalue < cutoff, ]
+tempres_AD$Estimate[tempres_AD$Estimate < -0.1] <- -0.1
+tempres_AD$Estimate[tempres_AD$Estimate > 0.1] <- 0.1
+tempres_CON <- restab_CON[restab_CON$Pathway == pathname, ]
+tempres_CON$Qvalue[is.nan(tempres_CON$Qvalue)] <- 1
+tempres_CON <- tempres_CON[tempres_CON$Qvalue < cutoff, ]
+tempres_CON$Estimate[tempres_CON$Estimate < -0.1] <- -0.1
+tempres_CON$Estimate[tempres_CON$Estimate > 0.1] <- 0.1
+# obtain cell types
+all_celltype <- unique(c(tempres_AD$CellType_Sender, tempres_AD$CellType_Receiver, 
+                         tempres_CON$CellType_Sender, tempres_CON$CellType_Receiver))
+all_celltype <- all_celltype[order(all_celltype)]
+# set up the network matrix
+netm_AD <- matrix(0, nrow=length(all_celltype), ncol=length(all_celltype))
+for (i in 1:length(all_celltype)) {
+  for (j in 1:length(all_celltype)) {
+    if (any(tempres_AD$CellType_Sender == all_celltype[i] & tempres_AD$CellType_Receiver == all_celltype[j]))
+    netm_AD[i, j] <- tempres_AD$Estimate[tempres_AD$CellType_Sender == all_celltype[i] & tempres_AD$CellType_Receiver == all_celltype[j]]
+  }
+}
+row.names(netm_AD) <- all_celltype
+colnames(netm_AD) <- all_celltype
+netm_CON <- matrix(0, nrow=length(all_celltype), ncol=length(all_celltype))
+for (i in 1:length(all_celltype)) {
+  for (j in 1:length(all_celltype)) {
+    if (any(tempres_CON$CellType_Sender == all_celltype[i] & tempres_CON$CellType_Receiver == all_celltype[j]))
+      netm_CON[i, j] <- tempres_CON$Estimate[tempres_CON$CellType_Sender == all_celltype[i] & tempres_CON$CellType_Receiver == all_celltype[j]]
+  }
+}
+row.names(netm_CON) <- all_celltype
+colnames(netm_CON) <- all_celltype
+# prepare for the networks
+net_AD <- graph_from_adjacency_matrix(netm_AD, mode="directed", weighted=TRUE)
+E(net_AD)$color[E(net_AD)$weight < 0] <- '#a0bbeb'
+E(net_AD)$color[E(net_AD)$weight > 0] <- '#FF9797'
+E(net_AD)$weight <- abs(E(net_AD)$weight)
+edge.weight.max <- max(E(net_AD)$weight)
+E(net_AD)$width<- 0.3+E(net_AD)$weight/edge.weight.max * 3
+net_CON <- graph_from_adjacency_matrix(netm_CON, mode="directed", weighted=TRUE)
+E(net_CON)$color[E(net_CON)$weight < 0] <- '#a0bbeb'
+E(net_CON)$color[E(net_CON)$weight > 0] <- '#FF9797'
+E(net_CON)$weight <- abs(E(net_CON)$weight)
+edge.weight.max <- max(E(net_CON)$weight)
+E(net_CON)$width<- 0.3+E(net_CON)$weight/edge.weight.max * 3
+# draw network plots
+par(mfrow=c(1, 2), mar=c(0, 0, 0, 0))
+plot(net_AD, 
+     vertex.color="#C5E0B4", 
+     vertex.label.color="black",
+     ertex.size=15,
+     vertex.label.font=1.8, 
+     vertex.label.family="sans",
+     vertex.frame.color="gray50", 
+     vertex.label.cex=0.8, 
+     edge.arrow.size=0.3, 
+     edge.curved=0.3,
+     layout=layout_in_circle, 
+     margin=c(0, 0, 0.5, 0.3))
+text(0, 1.3, "Disease", cex=1.2)
+plot(net_CON, 
+     vertex.color="#C5E0B4", 
+     vertex.label.color="black", 
+     vertex.size=15,
+     vertex.label.font=1.8, 
+     vertex.label.family="sans",
+     vertex.frame.color="gray50", 
+     vertex.label.cex=0.8, 
+     edge.arrow.size=0.3, 
+     edge.curved=0.3,
+     layout=layout_in_circle, 
+     margin=c(0, 0, 0.5, 0.3))
+text(0, 1.3, "Control", cex=1.2)
+title("LAMININ Signaling Pathway", line=-1, outer=TRUE)
+
+```
