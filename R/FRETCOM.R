@@ -11,9 +11,9 @@
 #' @param receptors A list or vector of gene names for receptors corresponding to LR 
 #'                pairs. Please make sure the order is the same as `ligands`.
 #' @param ngridx An integer to indicate the number of grids that will be create 
-#'              for the X coordinate if `re=TRUE`. Default is `5`.
+#'              for the X coordinate. Default is `5`.
 #' @param ngridy An integer to indicate the number of grids that will be create 
-#'              for the Y coordinate if `re=TRUE`. Default is `5`.
+#'              for the Y coordinate. Default is `5`.
 #' @param coordx A vector of X coordinates for cells/spots. Please make sure the 
 #'              order can match the order of columns in `stdat`.
 #' @param coordy A vector of Y coordinates for cells/spots. Please make sure the 
@@ -325,9 +325,9 @@ FRETCOM <- function(stdat, M, ligands, receptors, ngridx=5, ngridy=5,
 #' @param pathways A vector of signaling pathway names for corresponding LR 
 #'                pairs. Please make sure the order is the same as `ligands` and `receptors`.
 #' @param ngridx An integer to indicate the number of grids that will be create 
-#'              for the X coordinate if `re=TRUE`. Default is `5`.
+#'              for the X coordinate. Default is `5`.
 #' @param ngridy An integer to indicate the number of grids that will be create 
-#'              for the Y coordinate if `re=TRUE`. Default is `5`.
+#'              for the Y coordinate. Default is `5`.
 #' @param coordx A vector of X coordinates for cells/spots. Please make sure the 
 #'              order can match the order of columns in `stdat`.
 #' @param coordy A vector of Y coordinates for cells/spots. Please make sure the 
@@ -654,7 +654,7 @@ FRETCOMPathway <- function(stdat, M, ligands, receptors, pathways,
                                       message(sprintf("Pathway: %s", k))
                                       
                                       Y <- Cspots_aggregate[[k]]
-                                      tempres <- gamfun(Ms=Ms, dist=D, Y=Y, spot=spot1, rho=rholist)
+                                      tempres <- gamfun(Ms=Ms, dist=D, Y=Y, spot=spot1, rholist=rholist)
                                       
                                       temp_pathway <- ifelse(k == length(Cspots_aggregate), "Overall", pathways_uniq[k])
                                       

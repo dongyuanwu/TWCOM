@@ -36,10 +36,10 @@ pairs. Please make sure the order is the same as \code{receptors}.}
 pairs. Please make sure the order is the same as \code{ligands}.}
 
 \item{ngridx}{An integer to indicate the number of grids that will be create
-for the X coordinate if \code{re=TRUE}. Default is \code{5}.}
+for the X coordinate. Default is \code{5}.}
 
 \item{ngridy}{An integer to indicate the number of grids that will be create
-for the Y coordinate if \code{re=TRUE}. Default is \code{5}.}
+for the Y coordinate. Default is \code{5}.}
 
 \item{coordx}{A vector of X coordinates for cells/spots. Please make sure the
 order can match the order of columns in \code{stdat}.}
